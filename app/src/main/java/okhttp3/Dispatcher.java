@@ -45,12 +45,15 @@ public final class Dispatcher {
   /** Executes calls. Created lazily. */
   private @Nullable ExecutorService executorService;
 
+  //等待执行任务的队列
   /** Ready async calls in the order they'll be run. */
   private final Deque<AsyncCall> readyAsyncCalls = new ArrayDeque<>();
 
+  //正在执行异步任务的队列
   /** Running asynchronous calls. Includes canceled calls that haven't finished yet. */
   private final Deque<AsyncCall> runningAsyncCalls = new ArrayDeque<>();
 
+  //正在执行同步任务的队列
   /** Running synchronous calls. Includes canceled calls that haven't finished yet. */
   private final Deque<okhttp3.RealCall> runningSyncCalls = new ArrayDeque<>();
 
@@ -126,10 +129,13 @@ public final class Dispatcher {
   }
 
   synchronized void enqueue(AsyncCall call) {
+    //maxRequests 并行运行的任务是64
+    //maxRequestsPerHost 请求同一个主机的并行任务的最大值是5
     if (runningAsyncCalls.size() < maxRequests && runningCallsForHost(call) < maxRequestsPerHost) {
       runningAsyncCalls.add(call);
       executorService().execute(call);
     } else {
+      //思考：readyAsyncCalls 队列的任务什么时候会被执行
       readyAsyncCalls.add(call);
     }
   }
@@ -152,6 +158,9 @@ public final class Dispatcher {
     }
   }
 
+  /**
+   * 迭代 readyAsyncCalls 队列，将满足条件的call，放入执行队列中执行
+   */
   private void promoteCalls() {
     if (runningAsyncCalls.size() >= maxRequests) return; // Already running max capacity.
     if (readyAsyncCalls.isEmpty()) return; // No ready calls to promote.
@@ -162,6 +171,7 @@ public final class Dispatcher {
       if (runningCallsForHost(call) < maxRequestsPerHost) {
         i.remove();
         runningAsyncCalls.add(call);
+        //执行等待队列中的任务
         executorService().execute(call);
       }
 
@@ -193,6 +203,13 @@ public final class Dispatcher {
     finished(runningSyncCalls, call, false);
   }
 
+  /**
+   * 每次执行完一个任务，会检查等待队列任务是否满足可执行条件
+   * @param calls
+   * @param call
+   * @param promoteCalls
+   * @param <T>
+   */
   private <T> void finished(Deque<T> calls, T call, boolean promoteCalls) {
     int runningCallsCount;
     Runnable idleCallback;

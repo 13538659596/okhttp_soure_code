@@ -96,8 +96,11 @@ final class RealCall implements okhttp3.Call {
       if (executed) throw new IllegalStateException("Already Executed");
       executed = true;
     }
+    //跟踪调用栈
     captureCallStackTrace();
+    //事件监听
     eventListener.callStart(this);
+    //事件分发
     client.dispatcher().enqueue(new AsyncCall(responseCallback));
   }
 
@@ -145,7 +148,9 @@ final class RealCall implements okhttp3.Call {
     @Override protected void execute() {
       boolean signalledCallback = false;
       try {
+        //拦截器, 责任链模式, 返回服务器响应
         Response response = getResponseWithInterceptorChain();
+
         if (retryAndFollowUpInterceptor.isCanceled()) {
           signalledCallback = true;
           responseCallback.onFailure(RealCall.this, new IOException("Canceled"));
@@ -162,6 +167,8 @@ final class RealCall implements okhttp3.Call {
           responseCallback.onFailure(RealCall.this, e);
         }
       } finally {
+        //一次请求结束，无论请求成功或者失败，都会调用，
+        // 这里会判断正在执行的任务队列是否满足条件，可以将等待任务队列的任务放进来执行
         client.dispatcher().finished(this);
       }
     }
