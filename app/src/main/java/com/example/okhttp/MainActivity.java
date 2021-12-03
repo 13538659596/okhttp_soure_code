@@ -20,7 +20,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         String url = "http://wwww.baidu.com";
         OkHttpClient okHttpClient = new OkHttpClient();
         final Request request = new Request.Builder()
